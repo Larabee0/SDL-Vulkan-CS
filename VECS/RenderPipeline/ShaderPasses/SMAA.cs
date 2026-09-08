@@ -249,15 +249,24 @@ namespace VECS
                 Console.WriteLine($"SMAA ENABLED {_smaaEnabled}");
             }
 
-            if (!_smaaEnabled) return;
-            PostProcessingAttachment.BeginRenderingOnlyAttachment(frameInfo.CommandBuffer);
-            NeighbourhoodBlending.Bind(frameInfo);
-            GraphicsDevice.DeviceAPI.vkCmdDraw(frameInfo.CommandBuffer, 3, 1, 0, 0);
-            GraphicsDevice.DeviceAPI.vkCmdEndRendering(frameInfo.CommandBuffer);
+            if (!_smaaEnabled)
+            {
+                var deferred = (DeferredRenderer)ActiveRenderer;
+                PostProcessingAttachment.Target.SetImageLayoutAuto(frameInfo.CommandBuffer, VkImageLayout.TransferDstOptimal);
+                deferred.BlitFromMainColour(frameInfo.CommandBuffer, PostProcessingAttachment.VkImage, PostProcessingAttachment.Target.Width, PostProcessingAttachment.Target.Height, VkImageAspectFlags.Color);
+            }
+            else
+            {
+                PostProcessingAttachment.BeginRenderingOnlyAttachment(frameInfo.CommandBuffer);
+                NeighbourhoodBlending.Bind(frameInfo);
+                GraphicsDevice.DeviceAPI.vkCmdDraw(frameInfo.CommandBuffer, 3, 1, 0, 0);
+                GraphicsDevice.DeviceAPI.vkCmdEndRendering(frameInfo.CommandBuffer);
+            }
         }
 
         private void BlendWeightCalculation(RendererFrameInfo frameInfo)
         {
+            if (!_smaaEnabled) return;
             BlendTarget.BeginRenderingOnlyAttachment(frameInfo.CommandBuffer);
             BlendWeightCalc.Bind(frameInfo);
             GraphicsDevice.DeviceAPI.vkCmdDraw(frameInfo.CommandBuffer, 3, 1, 0, 0);
@@ -266,6 +275,7 @@ namespace VECS
 
         private void EdgeDetectionPass(RendererFrameInfo frameInfo)
         {
+            if (!_smaaEnabled) return;
             EdgeTarget.BeginRenderingOnlyAttachment(frameInfo.CommandBuffer);
             EdgeDetection.Bind(frameInfo);
             GraphicsDevice.DeviceAPI.vkCmdDraw(frameInfo.CommandBuffer, 3, 1, 0, 0);
