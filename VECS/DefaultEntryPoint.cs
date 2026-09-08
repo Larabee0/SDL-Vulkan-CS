@@ -124,7 +124,7 @@ namespace VECS
             entityManager.AddComponent(dirLight, new ShadowInfo()
             {
                 UpdateBehaviour = ShadowUpdate.Always,
-                Resolution = ShadowMapResolution.FouryNinteySix.GetResolution(),
+                Resolution = ShadowMapResolution.TwentyFourtyEight.GetResolution(),
             });
         }
 

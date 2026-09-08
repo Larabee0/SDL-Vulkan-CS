@@ -14,6 +14,7 @@ namespace VECS
         public RenderTarget BrightObjectAttachment;
         public RenderTarget DepthAttachment;
 
+        public RenderTarget PostProcessingAttachment;
 
         public static readonly int G_PositionPropertyId = "g_PositionIn".GetShaderPropertyId();
         public static readonly int G_NormalsPropertyId = "g_NormalsIn".GetShaderPropertyId();
@@ -60,6 +61,15 @@ namespace VECS
                 VkImageLayout.General,
                 VkImageLayout.General,
                 new(0, 0, 0, 1)));
+
+            RenderGraph.AddResource(new("PostProcessingColourAttachment", "PostProcessingAttachment".GetShaderPropertyId(), VkFormat.B10G11R11UfloatPack32, 0,
+                VkImageUsageFlags.Storage,
+                VkImageLayout.ShaderReadOnlyOptimal,
+                VkImageLayout.ColorAttachmentOptimal,
+                VkImageLayout.General,
+                VkImageLayout.General,
+                new(0, 0, 0, 1)));
+
             RenderGraph.AddResource(new("BrightObjectAttachment", ShaderProperties.BrightColourAttachmentId, ColourFormats[1], 0,
                 VkImageUsageFlags.Storage,
                 VkImageLayout.ShaderReadOnlyOptimal,
@@ -186,7 +196,7 @@ namespace VECS
             MainColourAttachment = RenderGraph.GetResource("MainColourAttachment");
             BrightObjectAttachment = RenderGraph.GetResource("BrightObjectAttachment");
             DepthAttachment = RenderGraph.GetResource("MainDepthAttachment");
-
+            PostProcessingAttachment = RenderGraph.GetResource("PostProcessingColourAttachment");
             G_PositionAttachment = RenderGraph.GetResource("G_PositionAttachment");
             G_NormalAttachment = RenderGraph.GetResource("G_NormalAttachment");
             G_AlbedoAttachment = RenderGraph.GetResource("G_AlbedoAttachment");
@@ -250,7 +260,7 @@ namespace VECS
             // blit renderImage into swapchain
             var extents = SwapChain.SwapChainExtent;
             GraphicsDevice.BeginLabelCmd(frameInfo.CommandBuffer, "SwapChain Blit");
-            BlitFromMainColour(frameInfo.CommandBuffer, SwapChain.MainSwapChainData.SwapChainImages[imageIndex], (int)extents.width, (int)extents.height, VkImageAspectFlags.Color);
+            BlitFromPostProcessingColour(frameInfo.CommandBuffer, SwapChain.MainSwapChainData.SwapChainImages[imageIndex], (int)extents.width, (int)extents.height, VkImageAspectFlags.Color);
 
             GraphicsDevice.EndLabelCmd(frameInfo.CommandBuffer);
         }
@@ -378,10 +388,10 @@ namespace VECS
 
         public void StartForwardRendering(RendererFrameInfo frameInfo, VkAttachmentLoadOp colourLoad)
         {
-            StartForwardRendering(frameInfo.CommandBuffer, colourLoad);
             MainColourAttachment.Target.SetImageLayoutAuto(frameInfo.CommandBuffer, VkImageLayout.ColorAttachmentOptimal);
             BrightObjectAttachment.Target.SetImageLayoutAuto(frameInfo.CommandBuffer, VkImageLayout.ColorAttachmentOptimal);
             DepthAttachment.Target.SetImageLayoutAuto(frameInfo.CommandBuffer, VkImageLayout.DepthAttachmentOptimal);
+            StartForwardRendering(frameInfo.CommandBuffer, colourLoad);
         }
 
         public unsafe void StartForwardRendering(VkCommandBuffer commandBuffer, VkAttachmentLoadOp colourLoad, bool onlyMainAttachment = false, bool noDepth = false)
@@ -410,6 +420,14 @@ namespace VECS
             TextureExtensions.BlitGeneric(commandBuffer, VkFilter.Linear, MainColourAttachment.GetBlitCmd(dstWidth, dstHeight, dstAspectMask), MainColourAttachment.VkImage, MainColourAttachment.CurrentLayout, dst, VkImageLayout.TransferDstOptimal);
 
             MainColourAttachment.Target.SetImageLayoutAuto(commandBuffer, VkImageLayout.ColorAttachmentOptimal);
+        }
+        public void BlitFromPostProcessingColour(VkCommandBuffer commandBuffer, VkImage dst, int dstWidth, int dstHeight, VkImageAspectFlags dstAspectMask)
+        {
+            PostProcessingAttachment.Target.SetImageLayoutAuto(commandBuffer, VkImageLayout.TransferSrcOptimal);
+
+            TextureExtensions.BlitGeneric(commandBuffer, VkFilter.Linear, PostProcessingAttachment.GetBlitCmd(dstWidth, dstHeight, dstAspectMask), PostProcessingAttachment.VkImage, PostProcessingAttachment.CurrentLayout, dst, VkImageLayout.TransferDstOptimal);
+
+            PostProcessingAttachment.Target.SetImageLayoutAuto(commandBuffer, VkImageLayout.ColorAttachmentOptimal);
         }
     }
 }

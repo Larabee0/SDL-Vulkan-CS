@@ -242,6 +242,16 @@ namespace VECS
             DescriptorBuffer.SetOffsets(frameInfo.CommandBuffer, Pipeline.PipelineLayout, VkPipelineBindPoint.Graphics, 0, (uint)DescriptorSetCount, offsets, indices);
         }
 
+        public void SetSampler(uint setIndex, uint bindPoint, TextureSampler sampler)
+        {
+
+            for (int f = 0; f < SwapChain.MAX_CONCURRENT_FRAMES; f++)
+            {
+                var descriptorBuffer = GetDescriptorBuffer(setIndex, f);
+                SetSampler(descriptorBuffer, sampler._textureSampler, bindPoint, setIndex);
+            }
+        }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void SetTexture(uint setIndex, uint bindPoint, Texture texture, int index = 0)
         {
@@ -306,6 +316,12 @@ namespace VECS
         private static unsafe void SetTextures(DescriptorBuffer buffer, VkDescriptorType descriptorType, VkDescriptorImageInfo* imageInfos, uint imageCount, uint bindingIndex,  uint variant)
         {
             buffer.SetImageInfoBinding(imageInfos, imageCount, descriptorType, variant, bindingIndex);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static void SetSampler(DescriptorBuffer buffer, VkSampler sampler, uint bindingIndex, uint variant)
+        {
+            buffer.SetSamplerBinding(sampler, variant, bindingIndex);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

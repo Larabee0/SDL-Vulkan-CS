@@ -5,19 +5,21 @@
 #include "smaa_functions.glsl"
 
 #define SMAA_EDGES_COLOR
+#define GAMMA_FOR_EDGE_DETECTION (1/2.2)
 
 layout (location = 0) in vec2 vTexCoord0;
 layout (location = 1) in vec4 vOffset[3];
 layout (location = 0) out vec4 outFragColour;
 
+layout (set = 0, binding = 0) uniform sampler uSampler;
 #if defined(SMAA_EDGES_DEPTH) || SMAA_PREDICATION
-layout (set = 0, binding = 0) uniform sampler2D uDepthTexture;
+layout (set = 0, binding = 1) uniform texture2D uDepthTexture;
 #endif
 
 #if !defined(SMAA_EDGES_DEPTH) && SMAA_PREDICATION
-layout (set = 0, binding = 1) uniform sampler2D uColourTexture;
+layout (set = 0, binding = 2) uniform texture2D uColourTexture;
 #elif !defined(SMAA_EDGES_DEPTH) && !SMAA_PREDICATION
-layout (set = 0, binding = 0) uniform sampler2D uColourTexture;
+layout (set = 0, binding = 1) uniform texture2D uColourTexture;
 #endif
 
 #ifdef SMAA_EDGES_LUMA
@@ -85,12 +87,13 @@ vec2 SMAALumaEdgeDetectionPS(vec2 texcoord,
 /**
  * Colour Edge Detection
  *
- * IMPORTANT NOTICE: colour edge detection requires gamma-corrected colours, and
+ * IMPORTANT NOTICE: edges edge detection requires gamma-corrected colours, and
  * thus 'colourTex' should be a non-sRGB texture.
  */
 vec2 SMAAColourEdgeDetectionPS(vec2 texcoord,
                                 vec4 offset[3],
-                                sampler2D colourTex
+                                sampler texSampler,
+                                texture2D colourTex
                                 #if SMAA_PREDICATION
                                 , sampler2D predicationTex
                                 #endif
@@ -102,15 +105,15 @@ vec2 SMAAColourEdgeDetectionPS(vec2 texcoord,
     vec2 threshold = vec2(SMAA_THRESHOLD, SMAA_THRESHOLD);
     #endif
 
-    // Calculate colour deltas:
+    // Calculate edges deltas:
     vec4 delta;
-    vec3 C = texture(colourTex, texcoord).rgb;
+    vec3 C = PositivePow(texture(sampler2D(colourTex, texSampler), texcoord).rgb,GAMMA_FOR_EDGE_DETECTION);
 
-    vec3 Cleft = texture(colourTex, offset[0].xy).rgb;
+    vec3 Cleft =  PositivePow(texture(sampler2D(colourTex, texSampler), offset[0].xy).rgb,GAMMA_FOR_EDGE_DETECTION);
     vec3 t = abs(C - Cleft);
     delta.x = max(max(t.r, t.g), t.b);
 
-    vec3 Ctop  = texture(colourTex, offset[0].zw).rgb;
+    vec3 Ctop  =  PositivePow(texture(sampler2D(colourTex, texSampler), offset[0].zw).rgb,GAMMA_FOR_EDGE_DETECTION);
     t = abs(C - Ctop);
     delta.y = max(max(t.r, t.g), t.b);
 
@@ -122,11 +125,11 @@ vec2 SMAAColourEdgeDetectionPS(vec2 texcoord,
         discard;
 
     // Calculate right and bottom deltas:
-    vec3 Cright = texture(colourTex, offset[1].xy).rgb;
+    vec3 Cright =  PositivePow(texture(sampler2D(colourTex, texSampler), offset[1].xy).rgb,GAMMA_FOR_EDGE_DETECTION);
     t = abs(C - Cright);
     delta.z = max(max(t.r, t.g), t.b);
 
-    vec3 Cbottom  = texture(colourTex, offset[1].zw).rgb;
+    vec3 Cbottom  =  PositivePow(texture(sampler2D(colourTex, texSampler), offset[1].zw).rgb,GAMMA_FOR_EDGE_DETECTION);
     t = abs(C - Cbottom);
     delta.w = max(max(t.r, t.g), t.b);
 
@@ -134,11 +137,11 @@ vec2 SMAAColourEdgeDetectionPS(vec2 texcoord,
     vec2 maxDelta = max(delta.xy, delta.zw);
 
     // Calculate left-left and top-top deltas:
-    vec3 Cleftleft  = texture(colourTex, offset[2].xy).rgb;
+    vec3 Cleftleft  =  PositivePow(texture(sampler2D(colourTex, texSampler), offset[2].xy).rgb,GAMMA_FOR_EDGE_DETECTION);
     t = abs(C - Cleftleft);
     delta.z = max(max(t.r, t.g), t.b);
 
-    vec3 Ctoptop = texture(colourTex, offset[2].zw).rgb;
+    vec3 Ctoptop =  PositivePow(texture(sampler2D(colourTex, texSampler), offset[2].zw).rgb,GAMMA_FOR_EDGE_DETECTION);
     t = abs(C - Ctoptop);
     delta.w = max(max(t.r, t.g), t.b);
 
@@ -174,22 +177,22 @@ vec2 SMAADepthEdgeDetectionPS(vec2 texcoord,
 
 void main()
 {
-    vec4 colour;
+    vec2 edges;
 
     #ifdef SMAA_EDGES_DEPTH
-    colour.xy = SMAADepthEdgeDetectionPS(vTexCoord0, vOffset, uDepthTexture);
+    edges = SMAADepthEdgeDetectionPS(vTexCoord0, vOffset, uDepthTexture);
     #elif defined(SMAA_EDGES_LUMA)
-    colour.xy= SMAALumaEdgeDetectionPS(vTexCoord0,vOffset,uColourTexture
+    edges= SMAALumaEdgeDetectionPS(vTexCoord0,vOffset,uColourTexture
     #if SMAA_PREDICATION
     ,uDepthTexture
     #endif
     );
     #elif defined(SMAA_EDGES_COLOR)
-    colour.xy = SMAAColourEdgeDetectionPS(vTexCoord0,vOffset,uColourTexture
+    edges = SMAAColourEdgeDetectionPS(vTexCoord0,vOffset,uSampler,uColourTexture
     #if SMAA_PREDICATION
     ,uDepthTexture
     #endif
     );
     #endif
-    outFragColour = colour;
+    outFragColour = vec4(edges,0.0,0.0);
 }

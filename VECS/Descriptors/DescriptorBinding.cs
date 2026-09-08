@@ -13,6 +13,8 @@ namespace VECS
         public readonly uint DescriptorSetIndex;
         public readonly uint BindPoint;
         public readonly DescriptorPropertyInfo[] Variables;
+
+        public readonly bool Sampler;
         public readonly bool Image;
         public readonly bool ImageBindingArray;
         public readonly bool Buffer;
@@ -59,6 +61,13 @@ namespace VECS
                     DynamicBuffer = true;
                     break;
                 case SpvReflectDescriptorType.StorageImage:
+                    Image = true;
+                    ImageBindingArray = descriptorBinding.array.dims_count != 0;
+                    break;
+                case SpvReflectDescriptorType.Sampler:
+                    Sampler = true;
+                    break;
+                case SpvReflectDescriptorType.SampledImage:
                     Image = true;
                     ImageBindingArray = descriptorBinding.array.dims_count != 0;
                     break;

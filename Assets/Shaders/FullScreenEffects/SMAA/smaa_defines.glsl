@@ -15,7 +15,7 @@
  *   contrast edges are properly filtered by just 2x.
  */
 #ifndef SMAA_THRESHOLD
-#define SMAA_THRESHOLD 0.05
+#define SMAA_THRESHOLD 0.1
 #endif
 
 /**
@@ -68,7 +68,7 @@
  * Range: [0, 112]
  */
 #ifndef SMAA_MAX_SEARCH_STEPS
-#define SMAA_MAX_SEARCH_STEPS 32
+#define SMAA_MAX_SEARCH_STEPS 16
 #endif
 /**
  * If there is an neighbor edge that has SMAA_LOCAL_CONTRAST_FACTOR times
@@ -96,7 +96,7 @@
  * Define SMAA_DISABLE_DIAG_DETECTION to disable diagonal processing.
  */
 #ifndef SMAA_MAX_SEARCH_STEPS_DIAG
-#define SMAA_MAX_SEARCH_STEPS_DIAG 16
+#define SMAA_MAX_SEARCH_STEPS_DIAG 8
 #endif
 
 #define SMAA_CORNER_ROUNDING 25

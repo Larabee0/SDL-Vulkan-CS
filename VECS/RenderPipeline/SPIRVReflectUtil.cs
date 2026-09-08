@@ -123,11 +123,9 @@ namespace VECS
         {
             return binding.descriptor_type switch
             {
-                // case SpvReflectDescriptorType.Sampler:
-                //     break;
+                SpvReflectDescriptorType.Sampler => [GetBlockSampler(bindingParentName, binding)],
                 SpvReflectDescriptorType.CombinedImageSampler => [GetBlockImage(bindingParentName, binding, binding.image)],
-                // case SpvReflectDescriptorType.SampledImage:
-                //     break;
+                SpvReflectDescriptorType.SampledImage => [GetBlockImage(bindingParentName, binding, binding.image)],
                 SpvReflectDescriptorType.StorageImage => [GetBlockImage(bindingParentName, binding, binding.image)],
                 SpvReflectDescriptorType.UniformBuffer => [.. GetBlockMembers(bindingParentName, binding.block)],
                 SpvReflectDescriptorType.StorageBuffer => [.. GetBlockMembers(bindingParentName, binding.block)],
@@ -241,6 +239,11 @@ namespace VECS
             }
 
                 throw new NotImplementedException(string.Format("Image type not implemented for sampled = {0}", traits.sampled.ToString()));
+        }
+
+        public static DescriptorPropertyInfo GetBlockSampler(string bindingParentName, SpvReflectDescriptorBinding bindings)
+        {
+            return new DescriptorPropertyInfo(bindingParentName, bindings.Name, SpvOp.ConstantSampler,0);
         }
     }
 }

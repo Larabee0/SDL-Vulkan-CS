@@ -19,6 +19,7 @@ namespace VECS
         private readonly ComputePipeline _downSample;
         private readonly ComputePipeline _upSample;
         private readonly ComputeVariant _bloomMix;
+        private readonly Material _bloomMixer;
 
         private readonly Texture2D _bloomDown;
         private readonly Texture2D _bloomUp;
@@ -38,6 +39,11 @@ namespace VECS
             var colourFormat = _activeRenderer.ColourFormats[0];
             _bloomDown = new("PhyBloomDownTexture", 8, 8, colourFormat, VkImageUsageFlags.Storage | VkImageUsageFlags.Sampled | VkImageUsageFlags.TransferDst, VkSamplerAddressMode.ClampToEdge, true);
             _bloomUp = new("PhyBloomUpTexture", 8, 8, colourFormat, VkImageUsageFlags.Storage | VkImageUsageFlags.Sampled | VkImageUsageFlags.TransferDst, VkSamplerAddressMode.ClampToEdge, true);
+            var config = GraphicsPipelineConfigInfo.DefaultPipelineConfigInfo([], []);
+            config.rasterizationInfo.frontFace = VkFrontFace.Clockwise;
+            config.rasterizationInfo.cullMode = VkCullModeFlags.Front;
+            _bloomMixer = new GraphicsPipeline("BloomMixer", config, AssetDataBase<ShaderModule>.GetNamed("fullscreen.vert"), AssetDataBase<ShaderModule>.GetNamed("bloom_mixer.frag")).Default();
+            _bloomMixer.SetFloat("constants.bloomStrength".GetShaderPropertyId(), 0.07f);
             Application.Instance.OnDestroy += CleanUpViews;
 
             RenderGraph.AddPass("PhyBloomDownSample", PassType.Compute, ["ForwardPass", "DeferredCompositePass", "TransaprentComposite", "SMAA_Output"], ["MainColourAttachment"], ["PhyBloomAttachment"],BloomDownSample);
@@ -137,12 +143,14 @@ namespace VECS
 
             imageInfo.imageView = _mipUpViews[0];
 
+            _bloomMixer.SetTexture(SrcBloomTextureId, _bloomUp);
 
             _bloomMix.SetTexturesUnsafe(SrcBloomTextureId,&imageInfo,1);
             var mainTarget = EngineTextures.TryGetTexture(ShaderProperties.MainColourAttachmentId);
             imageInfo = mainTarget.First.ImageInfo;
             _bloomMix.SetTexturesUnsafe(SrcMainTextureId, &imageInfo, 1);
             _bloomMix.SetTexturesUnsafe(DstTextureId, &imageInfo, 1);
+            _bloomMixer.SetTexture(SrcMainTextureId,mainTarget);
         }
         private void BloomDownSample(RendererFrameInfo frameInfo)
         {
@@ -273,7 +281,16 @@ namespace VECS
                 MemoryBarrierHelper.MemoryBarrier(frameInfo.CommandBuffer, memoryBarrier);
             }
             _bloomUp.SetImageLayoutAuto(frameInfo.CommandBuffer, VkImageLayout.ShaderReadOnlyOptimal);
-            _bloomMix.Dispatch(frameInfo.CommandBuffer, Presenter.FrameIndex, GetGroupCount((uint)Screen.Width, 8), GetGroupCount((uint)Screen.Height, 8));
+            //_bloomMix.Dispatch(frameInfo.CommandBuffer, Presenter.FrameIndex, GetGroupCount((uint)Screen.Width, 8), GetGroupCount((uint)Screen.Height, 8));
+
+            var deferred = (DeferredRenderer)_activeRenderer;
+
+            deferred.StartForwardRendering(frameInfo.CommandBuffer, VkAttachmentLoadOp.Clear, false);
+
+            _bloomMixer.Bind(frameInfo);
+            GraphicsDevice.DeviceAPI.vkCmdDraw(frameInfo.CommandBuffer, 3, 1, 0, 0);
+            deferred.EndForwardRendering(frameInfo);
+
             unsafe
             {
                 VkMemoryBarrier2 memoryBarrier = new(VkPipelineStageFlags2.AllCommands, VkAccessFlags2.MemoryWrite | VkAccessFlags2.MemoryRead, VkPipelineStageFlags2.AllCommands, VkAccessFlags2.MemoryWrite | VkAccessFlags2.MemoryRead);

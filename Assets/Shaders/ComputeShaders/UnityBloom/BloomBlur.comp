@@ -30,16 +30,12 @@ void main()
     Store2Pixels(destIdx     , p00, p10);
     Store2Pixels(destIdx + 8u, p01, p11);
 
-    groupMemoryBarrier();
-    memoryBarrierShared();
     barrier();
 
     // Horizontally blur the pixels in LDS
     uint row = gl_LocalInvocationID.y << 4u;
     BlurHorizontally(row + (uint(gl_LocalInvocationID.x) << 1u), row + uint(gl_LocalInvocationID.x) + (uint(gl_LocalInvocationID.x) & 4u));
 
-    groupMemoryBarrier();
-    memoryBarrierShared();
     barrier();
 
     // Vertically blur the pixels in LDS and write the result to memory

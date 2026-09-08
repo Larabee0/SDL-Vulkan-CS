@@ -15,17 +15,13 @@ vec3 BlurPixels(vec3 a, vec3 b, vec3 c, vec3 d, vec3 e, vec3 f, vec3 g, vec3 h, 
 
 void Store2Pixels(uint index, vec3 pixel1, vec3 pixel2)
 {
-    atomicExchange(gs_cacheR[index], packHalf2x16(vec2(pixel1.r, pixel2.r)));
-    atomicExchange(gs_cacheG[index], packHalf2x16(vec2(pixel1.g, pixel2.g)));
-    atomicExchange(gs_cacheB[index], packHalf2x16(vec2(pixel1.b, pixel2.b)));
+    gs_cacheR[index] = packHalf2x16(vec2(pixel1.r, pixel2.r));
+    gs_cacheG[index] = packHalf2x16(vec2(pixel1.g, pixel2.g));
+    gs_cacheB[index] = packHalf2x16(vec2(pixel1.b, pixel2.b));
 }
 
 void Load2Pixels(uint index, out vec3 pixel1, out vec3 pixel2)
 {
-    groupMemoryBarrier();
-    memoryBarrierShared();
-    barrier();
-
     vec2 r = unpackHalf2x16(gs_cacheR[index]);
     vec2 g = unpackHalf2x16(gs_cacheG[index]);
     vec2 b = unpackHalf2x16(gs_cacheB[index]);
@@ -35,21 +31,13 @@ void Load2Pixels(uint index, out vec3 pixel1, out vec3 pixel2)
 
 void Store1Pixel(uint index, vec3 pixel)
 {
-    groupMemoryBarrier();
-    memoryBarrierShared();
-    barrier();
-
-    atomicExchange(gs_cacheR[index], floatBitsToUint(pixel.r));
-    atomicExchange(gs_cacheG[index], floatBitsToUint(pixel.g));
-    atomicExchange(gs_cacheB[index], floatBitsToUint(pixel.b));
+    gs_cacheR[index] = floatBitsToUint(pixel.r);
+    gs_cacheG[index] = floatBitsToUint(pixel.g);
+    gs_cacheB[index] = floatBitsToUint(pixel.b);
 }
 
 void Load1Pixel(uint index, out vec3 pixel)
 {
-    groupMemoryBarrier();
-    memoryBarrierShared();
-    barrier();
-
     pixel = uintBitsToFloat(uvec3(gs_cacheR[index], gs_cacheG[index], gs_cacheB[index]));
 }
 
@@ -84,6 +72,8 @@ void BlurVertically(uvec2 pixelCoord, uint topMostIndex)
 
     // Guard bands
     blurred *= all(pixelCoord , uvec2(constants.outputImageSize));
+
+    
 
     // Write to the final target
     imageStore(dstTexture,ivec2(pixelCoord),vec4(blurred,1.0));

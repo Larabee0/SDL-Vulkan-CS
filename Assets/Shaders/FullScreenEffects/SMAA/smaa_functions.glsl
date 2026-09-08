@@ -1,4 +1,8 @@
 
+
+vec3 PositivePow (vec3 base, vec3 power) {return pow (abs (base), power);}
+vec3 PositivePow (vec3 base, float power) {return pow (abs (base), vec3(power));}
+
 /**
  * Gathers current pixel, and the top-left neighbors.
  */

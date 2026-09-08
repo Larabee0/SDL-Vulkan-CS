@@ -223,7 +223,7 @@ namespace VECS
                 _renderTargetType = RenderTargetType.Colour;
             }
 
-            _image = new(string.Format("RT_{0}_{2}_{1}", name, Presenter.FrameCount, _renderTargetType.ToString()), width, height, format, usageFlags, samplerMode, 0, false, VkCompareOp.Never, false);
+            _image = new(string.Format("RT_{0}_{2}_{1}", name, Presenter.FrameCount, _renderTargetType.ToString()), width, height, format, usageFlags, samplerMode, 0, false, VkCompareOp.Never,VkSamplerMipmapMode.Nearest,VkBorderColor.FloatTransparentBlack,VkFilter.Linear, false);
 
             if (_renderTargetType == RenderTargetType.Colour)
             {

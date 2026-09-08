@@ -36,6 +36,8 @@ namespace VECS
         private readonly ComputeVariant _bloomUberPost;
 
         private readonly Material blit;
+        private readonly Material _bloomMix;
+
 
         private Texture2D[] _bloomMipDown;
         private Texture2D[] _bloomMipUp;
@@ -46,6 +48,7 @@ namespace VECS
         private readonly IRenderer _activeRenderer;
 
         private static bool Bloom_Enabled = true;
+        private RenderTarget PostProcessingAttachment;
 
         public UnityPhyBloom(IRenderer renderer)
         {
@@ -59,9 +62,11 @@ namespace VECS
             _bloomUberPost = ComputePipeline.GetOrCreate("bloom_mix.comp").Default();
 
             blit = EnginePipes.Blit.Create("Bloom");
-
-            
-
+            var config = GraphicsPipelineConfigInfo.DefaultPipelineConfigInfo([], []);
+            config.rasterizationInfo.frontFace = VkFrontFace.Clockwise;
+            config.rasterizationInfo.cullMode = VkCullModeFlags.Front;
+            _bloomMix = new GraphicsPipeline("BloomMixer", config, AssetDataBase<ShaderModule>.GetNamed( "fullscreen.vert"), AssetDataBase<ShaderModule>.GetNamed("bloom_mixer.frag")).Default();
+            _bloomMix.SetFloat("constants.bloomStrength".GetShaderPropertyId(), 0.07f);
             var colourFormat = VkFormat.B10G11R11UfloatPack32; //_activeRenderer.ColourFormats[0];
             //_bloomDown = new("PhyBloomDownTexture", 8, 8, colourFormat, VkImageUsageFlags.Storage | VkImageUsageFlags.Sampled | VkImageUsageFlags.TransferDst, VkSamplerAddressMode.ClampToEdge,0,false,VkCompareOp.Never,VkSamplerMipmapMode.Nearest,VkBorderColor.FloatOpaqueBlack,VkFilter.Linear, true);
             _bloomFinalMipUp = new("BloomFinalMipUp", 8, 8, colourFormat, VkImageUsageFlags.Storage | VkImageUsageFlags.Sampled | VkImageUsageFlags.TransferDst, VkSamplerAddressMode.ClampToEdge, 0, false, VkCompareOp.Never, VkSamplerMipmapMode.Nearest, VkBorderColor.FloatOpaqueBlack, VkFilter.Linear, false);
@@ -69,9 +74,9 @@ namespace VECS
 
             _bloomIntermediate = new("BloomIntermediate", 8, 8, colourFormat, VkImageUsageFlags.Storage | VkImageUsageFlags.Sampled | VkImageUsageFlags.TransferDst, VkSamplerAddressMode.ClampToEdge, 0, false, VkCompareOp.Never, VkSamplerMipmapMode.Nearest, VkBorderColor.FloatOpaqueBlack, VkFilter.Linear, false);
 
-            RenderGraph.AddPass("PhyBloomDownSample", PassType.Compute, ["ForwardPass", "DeferredCompositePass", "TransaprentComposite", "SMAA_Output"], ["MainColourAttachment"], ["PhyBloomAttachment"], BloomDownSample);
+            RenderGraph.AddPass("PhyBloomDownSample", PassType.Compute, ["ForwardPass", "DeferredCompositePass", "TransaprentComposite", "SMAA_Output"], ["PostProcessingColourAttachment"], ["PhyBloomAttachment"], BloomDownSample);
             RenderGraph.AddPass("PhyBloomUpSample", PassType.Compute, ["PhyBloomDownSample"], ["MainColourAttachment"], ["PhyBloomAttachment"], BloomUpSample);
-            RenderGraph.AddPass("PhyBloomMix", PassType.Compute, ["PhyBloomUpSample"], ["MainColourAttachment", "PhyBloomAttachment"], ["MainColourAttachment"], BloomMix);
+            RenderGraph.AddPass("PhyBloomMix", PassType.Compute, ["PhyBloomUpSample"], ["PostProcessingColourAttachment", "MainColourAttachment", "PhyBloomAttachment"], ["MainColourAttachment", "PostProcessingColourAttachment"], BloomMix);
         }
 
         public static void Bloom_Toggle_Input()
@@ -114,6 +119,7 @@ namespace VECS
             var windowExtents = Application.MainWindow.WindowExtent;
 
             TextureLoader.CalculateMipLevelSize(windowExtents.width, windowExtents.height, 1, out var mipWidth, out var mipHeight);
+            PostProcessingAttachment = RenderGraph.GetResource("PostProcessingColourAttachment");
 
             CleanUpViews();
             _bloomFinalMipUp.Reinitialise(mipWidth, mipHeight);
@@ -150,9 +156,10 @@ namespace VECS
             _bloomPrefilter.SetVector2(OutputImageSizeId, new(_bloomFinalMipUp.Width, _bloomFinalMipUp.Height));
             _bloomPrefilter.SetVector4(BloomThresholdId, bloomThreshold);
 
+            imageInfo = PostProcessingAttachment.Target.ImageInfo;
             _bloomPrefilter.SetTexturesUnsafe(SrcTextureId, &imageInfo, 1);
-            imageInfo = _bloomIntermediate.ImageInfo;
             _bloomUberPost.SetTexturesUnsafe(DstTextureId, &imageInfo, 1);
+            imageInfo = _bloomIntermediate.ImageInfo;
             _bloomUberPost.SetTexturesUnsafe(SrcMainTextureId, &imageInfo, 1);
             imageInfo = _bloomFinalMipUp.ImageInfo;
             _bloomPrefilter.SetTexturesUnsafe(DstTextureId, &imageInfo, 1);
@@ -224,6 +231,8 @@ namespace VECS
             _bloomUberPost.SetVector4(BloomTintId, new(1, 1, 1, 1));
             _bloomUberPost.SetFloat(BloomStrengthId, 0.17177f);
 
+            _bloomMix.SetTexture(SrcBloomTextureId, _bloomFinalMipUp);
+            _bloomMix.SetTexture(SrcMainTextureId, _bloomIntermediate);
             blit.SetTexture(inputTextureId, _bloomIntermediate);
         }
          
@@ -258,6 +267,12 @@ namespace VECS
         private unsafe void BloomDownSample(RendererFrameInfo frameInfo)
         {
             SetImages();
+            var deferred = (DeferredRenderer)_activeRenderer;
+
+            _bloomIntermediate.SetImageLayoutAuto(frameInfo.CommandBuffer, VkImageLayout.TransferDstOptimal);
+
+            deferred.BlitFromPostProcessingColour(frameInfo.CommandBuffer, _bloomIntermediate._vkImage, _bloomIntermediate.Width, _bloomIntermediate.Height, VkImageAspectFlags.Color);
+            _bloomIntermediate.SetImageLayoutAuto(frameInfo.CommandBuffer, VkImageLayout.ShaderReadOnlyOptimal);
             MemoryBarrier(frameInfo.CommandBuffer);
             _bloomPrefilter.Dispatch(frameInfo.CommandBuffer, Presenter.FrameIndex, GetGroupCount((uint)Screen.Width, 8), GetGroupCount((uint)Screen.Height, 8));
             VkImageMemoryBarrier2* barriers = stackalloc VkImageMemoryBarrier2[2];
@@ -326,21 +341,16 @@ namespace VECS
         {
             _bloomFinalMipUp.SetImageLayoutAuto(frameInfo.CommandBuffer, VkImageLayout.ShaderReadOnlyOptimal);
 
-            var deferred = (DeferredRenderer)_activeRenderer;
-
-            _bloomIntermediate.SetImageLayoutAuto(frameInfo.CommandBuffer, VkImageLayout.TransferDstOptimal);
-
-            deferred.BlitFromMainColour(frameInfo.CommandBuffer, _bloomIntermediate._vkImage, _bloomIntermediate.Width, _bloomIntermediate.Height, VkImageAspectFlags.Color);
-            _bloomIntermediate.SetImageLayoutAuto(frameInfo.CommandBuffer, VkImageLayout.ShaderReadOnlyOptimal);
             MemoryBarrier(frameInfo.CommandBuffer);
             _bloomUberPost.Dispatch(frameInfo.CommandBuffer,Presenter.FrameIndex,GetGroupCount((uint)Screen.Width,8), GetGroupCount((uint)Screen.Height, 8));
             MemoryBarrier(frameInfo.CommandBuffer);
 
-            deferred.StartForwardRendering(frameInfo.CommandBuffer, VkAttachmentLoadOp.Clear,true);
-
-            blit.Bind(frameInfo);
-            GraphicsDevice.DeviceAPI.vkCmdDraw(frameInfo.CommandBuffer,3,1,0,0);
-            deferred.EndForwardRendering(frameInfo);
+            // var deferred = (DeferredRenderer)_activeRenderer;
+            // deferred.StartForwardRendering(frameInfo.CommandBuffer, VkAttachmentLoadOp.Clear,true);
+            // 
+            // blit.Bind(frameInfo);
+            // GraphicsDevice.DeviceAPI.vkCmdDraw(frameInfo.CommandBuffer,3,1,0,0);
+            // deferred.EndForwardRendering(frameInfo);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

@@ -28,7 +28,7 @@ float Luminance(vec3 linearRgb)
 vec3 BilinearSample(vec2 uv, vec2 offset, out float weight)
 {
     //vec3 c = texture(srcTexture, s_linear_clamp_sampler, ClampAndScaleUVForBilinearPostProcessTexture(uv + offset * _PostProcessScreenSize.zw), 0.0).rgb;
-    vec3 c = texture(srcTexture, ClampAndScaleUVForBilinearPostProcessTexture(uv + offset * (vec2(1.0)/constants.srcResolution))).rgb;
+    vec3 c = texture(srcTexture, ClampAndScaleUVForBilinearPostProcessTexture(uv + offset * (vec2(1.0)/constants.srcResolution))).xyz;
 
     //c.xyz = QuadraticThreshold(c.xyz, _BloomThreshold.x, _BloomThreshold.yzw);
     c.xyz = QuadraticThreshold(c.xyz, constants.bloomThreshold.x, constants.bloomThreshold.yzw);
@@ -49,34 +49,37 @@ void main()
     vec2 texelSizeZW = vec2(1.0) / constants.outputImageSize;
     PositionInputs posInputs = GetPositionInput(vec2(gl_GlobalInvocationID.xy), texelSizeZW, uvec2(8, 8));
     vec2 uv = posInputs.positionNDC;
-
-    // "Post-Processing in CoD Advanced Warfare" [Jimenez14]
-    float wA, wB, wC, wD, wE, wF, wG, wH, wI, wJ, wK, wL, wM;
-    vec3 A = BilinearSample(uv, vec2(-1.0, -1.0), wA);
-    vec3 B = BilinearSample(uv, vec2( 0.0, -1.0), wB);
-    vec3 C = BilinearSample(uv, vec2( 1.0, -1.0), wC);
-    vec3 D = BilinearSample(uv, vec2(-0.5, -0.5), wD);
-    vec3 E = BilinearSample(uv, vec2( 0.5, -0.5), wE);
-    vec3 F = BilinearSample(uv, vec2(-1.0,  0.0), wF);
-    vec3 G = BilinearSample(uv, vec2( 0.0,  0.0), wG);
-    vec3 H = BilinearSample(uv, vec2( 1.0,  0.0), wH);
-    vec3 I = BilinearSample(uv, vec2(-0.5,  0.5), wI);
-    vec3 J = BilinearSample(uv, vec2( 0.5,  0.5), wJ);
-    vec3 K = BilinearSample(uv, vec2(-1.0,  1.0), wK);
-    vec3 L = BilinearSample(uv, vec2( 0.0,  1.0), wL);
-    vec3 M = BilinearSample(uv, vec2( 1.0,  1.0), wM);
-
-    vec3 prefilterOut = vec3(0);
-    prefilterOut += PartialAverage(D, E, I, J, wD, wE, wI, wJ) * 0.5;
-    prefilterOut += PartialAverage(A, B, F, G, wA, wB, wF, wG) * 0.125;
-    prefilterOut += PartialAverage(B, C, G, H, wB, wC, wG, wH) * 0.125;
-    prefilterOut += PartialAverage(F, G, K, L, wF, wG, wK, wL) * 0.125;
-    prefilterOut += PartialAverage(G, H, L, M, wG, wH, wL, wM) * 0.125;
-
+	const vec2 kTaps [] = {
+		vec2 (0.0, 0.0),
+		vec2 (0.9, - 0.4),
+		vec2 (- 0.9, 0.4),
+		vec2 (0.4, 0.9),
+		vec2 (- 0.4, - 0.9)
+	};
+	float w0, w1, w2, w3, w4;
+	vec3 color0 = BilinearSample (uv, kTaps [0], w0);
+	vec3 color1 = BilinearSample (uv, kTaps [1], w1);
+	vec3 color2 = BilinearSample (uv, kTaps [2], w2);
+	vec3 color3 = BilinearSample (uv, kTaps [3], w3);
+	vec3 color4 = BilinearSample (uv, kTaps [4], w4);
+	float wSum = w0 + w1 + w2 + w3 + w4;
+	color0 *= w0;
+	color1 *= w1;
+	color2 *= w2;
+	color3 *= w3;
+	color4 *= w4;
+	vec3 acc = color0 + color1 + color2 + color3 + color4;
+	vec3 prefilterOut = acc / wSum;
 
     // Guard bands
-    prefilterOut *= all(gl_GlobalInvocationID.xy, uvec2(constants.outputImageSize));
+//    prefilterOut *= all(gl_GlobalInvocationID.xy, uvec2(constants.outputImageSize));
     
+    if(gl_GlobalInvocationID.x > constants.outputImageSize.x  || gl_GlobalInvocationID.y > constants.outputImageSize.y){
+        prefilterOut  = vec3(0.0);
+    }
+
+
+
     imageStore(dstTexture, ivec2(posInputs.positionSS), vec4(prefilterOut,1.0));
 
 }

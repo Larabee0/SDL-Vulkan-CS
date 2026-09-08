@@ -26,6 +26,7 @@ namespace VECS
         public readonly DescriptorPropertyInfo[] Members;
         public readonly VkImageViewType ImageType;
         // public readonly bool ImageArray;
+        public readonly bool Sampler;
         public readonly uint ImageDepth;
         public readonly Dictionary<string, int> MemberMap;
         public readonly Dictionary<int, int> MemberMap2;
@@ -278,6 +279,17 @@ namespace VECS
             {
                 throw new NotImplementedException(string.Format("Image ms = {0} unhandled", imageTraits.ms));
             }
+        }
+
+        public DescriptorPropertyInfo(string parentName, string name, SpvOp type, uint offset)
+        {
+            Name = name;
+            AbsName = parentName + name;
+            Id = AbsName.GetShaderPropertyId();
+            Type = type;
+            Offset = offset;
+
+            Sampler = true;
         }
 
         public bool LookUpMember(string name, out DescriptorPropertyInfo propertyInfo)

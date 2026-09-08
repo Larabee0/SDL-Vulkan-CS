@@ -174,6 +174,11 @@ namespace VECS
             material.SetTexture(propertyInfo.SetIndex, propertyInfo.BindPoint, texture);
         }
 
+        public static void SetSampler(this Material material, ShaderProperty propertyInfo, TextureSampler sampler)
+        {
+            material.SetSampler(propertyInfo.SetIndex,propertyInfo.BindPoint, sampler);
+        }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void SetTexture(this Material material, int propertyId, ITextureProvider texture)
         {
@@ -195,6 +200,15 @@ namespace VECS
             if (material.LookUpProperty(propertyId, out var propertyInfo))
             {
                 material.SetTexture(propertyInfo, texture);
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void SetSampler(this Material material, int propertyId, TextureSampler sampler)
+        {
+            if (material.LookUpProperty(propertyId, out var propertyInfo) && propertyInfo.BindingInfo.Sampler)
+            {
+                material.SetSampler(propertyInfo, sampler);
             }
         }
 

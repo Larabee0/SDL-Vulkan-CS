@@ -235,13 +235,17 @@ namespace VECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static void CreateSampler(this Texture texture)
         {
-            if (!_samplers.TryGetValue( texture.GetSamplerId(), out var sampler))
+            texture._textureSampler = GetOrCreateSample(texture.GetSamplerCreateInfo());
+        }
+
+        public static TextureSampler GetOrCreateSample(VkSamplerCreateInfo samplerCreateInfo)
+        {
+            if(!_samplers.TryGetValue(GetSamplerId(samplerCreateInfo), out var sampler))
             {
-                sampler = new(texture.GetSamplerCreateInfo());
+                sampler = new(samplerCreateInfo);
                 _samplers.TryAdd(sampler.SamplerId, sampler);
             }
-
-            texture._textureSampler = sampler;
+            return sampler;
         }
 
         public unsafe static int GetSamplerId(VkSamplerCreateInfo samplerCreateInfo)

@@ -57,7 +57,8 @@ namespace VECS
             protected set
             {
                 _anisoLevel = value;
-                AnisotropyEnable = _anisoLevel > 0; 
+                AnisotropyEnable = _anisoLevel > 0;
+                
             }
         }
 
