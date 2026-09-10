@@ -73,7 +73,7 @@ namespace VECS
             };
             return new()
             {
-                colourFormats = Presenter.ColourFormats,
+                colourFormats = [Presenter.MainColourFormat],
                 depthFormat = Presenter.DepthFormat,
                 stencilFormat = VkFormat.Undefined,
                 pipelineRenderingCreateInfo = new(),

@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Runtime.CompilerServices;
-using VECS.ECS;
 using VECS.LowLevel;
 using Vortice.Vulkan;
 
@@ -11,7 +9,6 @@ namespace VECS
         const int DEPTH_ONLY_PUSH_CONSTANT_INDEX = 0;
 
         public RenderTarget MainColourAttachment { get; private set; }
-        public RenderTarget BrightObjectAttachment;
         public RenderTarget DepthAttachment;
 
         public RenderTarget PostProcessingAttachment;
@@ -30,7 +27,7 @@ namespace VECS
         public static bool useRenderGraph = true;
 
         private OIT _orderIndpTransparency;
-        private Bloom _bloom;
+
         private SMAA _smaa;
         private SSAO _ssao;
         private UnityPhyBloom _phyBloom;
@@ -41,9 +38,8 @@ namespace VECS
 
         private static ComputeVariant _deferredComposite;
 
-        public static readonly VkFormat[] Colours = [VkFormat.R32G32B32A32Sfloat, VkFormat.R32G32B32A32Sfloat];
-        public VkFormat[] ColourFormats => Colours;
-
+        public VkFormat MainColourFormat => VkFormat.R16G16B16A16Sfloat;
+        public VkFormat PostProcessingColourFormat => VkFormat.B10G11R11UfloatPack32;
         public VkFormat DepthFormat => PreferredFormats.LOW_PRECISION_DEPTH_ONLY;
 
         public VkFormat StencilFormat => VkFormat.Undefined;
@@ -54,7 +50,7 @@ namespace VECS
         {
             _deferredComposite = ComputePipeline.GetOrCreate("pbr_composit.comp").Default();
 
-            RenderGraph.AddResource(new("MainColourAttachment", ShaderProperties.MainColourAttachmentId, ColourFormats[0], 0,
+            RenderGraph.AddResource(new("MainColourAttachment", ShaderProperties.MainColourAttachmentId, MainColourFormat, 0,
                 VkImageUsageFlags.Storage,
                 VkImageLayout.ShaderReadOnlyOptimal,
                 VkImageLayout.ColorAttachmentOptimal,
@@ -63,14 +59,6 @@ namespace VECS
                 new(0, 0, 0, 1)));
 
             RenderGraph.AddResource(new("PostProcessingColourAttachment", "PostProcessingAttachment".GetShaderPropertyId(), VkFormat.B10G11R11UfloatPack32, 0,
-                VkImageUsageFlags.Storage,
-                VkImageLayout.ShaderReadOnlyOptimal,
-                VkImageLayout.ColorAttachmentOptimal,
-                VkImageLayout.General,
-                VkImageLayout.General,
-                new(0, 0, 0, 1)));
-
-            RenderGraph.AddResource(new("BrightObjectAttachment", ShaderProperties.BrightColourAttachmentId, ColourFormats[1], 0,
                 VkImageUsageFlags.Storage,
                 VkImageLayout.ShaderReadOnlyOptimal,
                 VkImageLayout.ColorAttachmentOptimal,
@@ -170,7 +158,6 @@ namespace VECS
             EnginePipes.DepthOnly.PushConstants.SetPushConstantInt("layerCount", DEPTH_ONLY_PUSH_CONSTANT_INDEX, 1);
             EnginePipes.DepthOnly.PushConstants.SetPushConstantInt("bufferSelect", DEPTH_ONLY_PUSH_CONSTANT_INDEX, 0);
             _orderIndpTransparency = new(this);
-            _bloom = new(this);
             _smaa = new(this);
             _ssao = new(this);
             _phyBloom = new(this);
@@ -194,7 +181,6 @@ namespace VECS
             RenderGraph.RecreateAttachments(0,windowExtents);
 
             MainColourAttachment = RenderGraph.GetResource("MainColourAttachment");
-            BrightObjectAttachment = RenderGraph.GetResource("BrightObjectAttachment");
             DepthAttachment = RenderGraph.GetResource("MainDepthAttachment");
             PostProcessingAttachment = RenderGraph.GetResource("PostProcessingColourAttachment");
             G_PositionAttachment = RenderGraph.GetResource("G_PositionAttachment");
@@ -203,7 +189,6 @@ namespace VECS
             G_MaskAttachment = RenderGraph.GetResource("G_MaskAttachment");
             
             _orderIndpTransparency?.RecreateRenderTargets();
-            _bloom?.RecreateRenderTargets();
             _smaa?.RecreateRenderTargets();
             _ssao?.RecreateRenderTargets();
             _phyBloom?.RecreateRenderTargets();
@@ -271,7 +256,7 @@ namespace VECS
             {
                 DrawBlob.Cull(_forwardQueue, frameInfo, frameInfo.CullData);
             }
-            StartForwardRendering(frameInfo.CommandBuffer, VkAttachmentLoadOp.Load, false, false);
+            StartForwardRendering(frameInfo.CommandBuffer, VkAttachmentLoadOp.Load, false);
             if (_forwardQueue.CommandCount > 0)
             {
                 DrawBlob.Execute(_forwardQueue, frameInfo, 0, VkCullModeFlags.Back);
@@ -348,14 +333,8 @@ namespace VECS
         private void DeferredCompositePass(RendererFrameInfo frameInfo)
         {
             _deferredComposite.PushConstantsHandler.SetPushConstantUInt("cameraIndex", 0, (uint)frameInfo.MainCamera);
-            _deferredComposite.Dispatch(frameInfo.CommandBuffer, Presenter.FrameIndex, GetGroupCount((uint)MainColourAttachment.Target.Width, 32), GetGroupCount((uint)MainColourAttachment.Target.Height, 32));
+            _deferredComposite.Dispatch(frameInfo.CommandBuffer, Presenter.FrameIndex, (uint)MainColourAttachment.Target.Width, (uint)MainColourAttachment.Target.Height);
 
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static uint GetGroupCount(uint threadCount, uint localSize)
-        {
-            return (threadCount + localSize - 1) / localSize;
         }
 
         private unsafe void StartDeferredRendering(RendererFrameInfo frameInfo)
@@ -389,21 +368,21 @@ namespace VECS
         public void StartForwardRendering(RendererFrameInfo frameInfo, VkAttachmentLoadOp colourLoad)
         {
             MainColourAttachment.Target.SetImageLayoutAuto(frameInfo.CommandBuffer, VkImageLayout.ColorAttachmentOptimal);
-            BrightObjectAttachment.Target.SetImageLayoutAuto(frameInfo.CommandBuffer, VkImageLayout.ColorAttachmentOptimal);
             DepthAttachment.Target.SetImageLayoutAuto(frameInfo.CommandBuffer, VkImageLayout.DepthAttachmentOptimal);
             StartForwardRendering(frameInfo.CommandBuffer, colourLoad);
         }
 
-        public unsafe void StartForwardRendering(VkCommandBuffer commandBuffer, VkAttachmentLoadOp colourLoad, bool onlyMainAttachment = false, bool noDepth = false)
+        public void StartForwardRendering(VkCommandBuffer commandBuffer, VkAttachmentLoadOp colourLoad, bool noDepth = false)
         {
-
-            VkRenderingAttachmentInfo* colourAttachments = stackalloc VkRenderingAttachmentInfo[]
+            if (noDepth)
             {
-                MainColourAttachment.GetAttachmentInfo(colourLoad),
-                BrightObjectAttachment.GetAttachmentInfo(colourLoad),
-            };
-
-            MainColourAttachment.BeginRenderingMultiAttachment(commandBuffer, 1, colourAttachments, onlyMainAttachment ? 1 : 2, DepthAttachment.GetAttachmentInfo(VkAttachmentLoadOp.Load));
+                MainColourAttachment.BeginRenderingOnlyAttachment(commandBuffer, colourLoad);
+            }
+            else
+            {
+                MainColourAttachment.BeginRenderingOneAttachmentWithDepthStencil(commandBuffer, DepthAttachment.GetAttachmentInfo(VkAttachmentLoadOp.Load), colourLoad);
+            }
+            
 
             Presenter.SetToCurrentCameraViewportScissor(commandBuffer);
         }

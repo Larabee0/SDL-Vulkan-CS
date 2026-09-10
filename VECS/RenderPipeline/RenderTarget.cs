@@ -389,6 +389,13 @@ namespace VECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public unsafe void BeginRenderingOneAttachmentWithDepthStencil(VkCommandBuffer commandBuffer, VkRenderingAttachmentInfo depthStencil, VkAttachmentLoadOp colourLoadOp = VkAttachmentLoadOp.Clear, VkAttachmentStoreOp colourStoreOp = VkAttachmentStoreOp.Store)
+        {
+            var colourAttachment = GetAttachmentInfo(colourLoadOp, colourStoreOp);
+            BeginRenderingMultiAttachment(commandBuffer, 1, &colourAttachment, 1, depthStencil);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe void BeginRenderingOnlyAttachment(VkCommandBuffer commandBuffer, VkClearValue clearValue, VkAttachmentLoadOp loadOp = VkAttachmentLoadOp.Clear, VkAttachmentStoreOp storeOp = VkAttachmentStoreOp.Store)
         {
             

@@ -16,12 +16,16 @@ namespace VECS
         internal ComputeVariant[] _computeVariants;
         public override int VariantCount => _computeVariants.Length;
 
+        private Vector3UInt _localSize = new(1, 1, 1);
+        public Vector3UInt LocalSize => _localSize;
+
         private readonly static ConcurrentDictionary<int, int> _lastBoundComputePipeline = new(Environment.ProcessorCount, Environment.ProcessorCount * 2);
 
         public unsafe ComputePipeline(string assetName, string shaderName)
         {
             AssetName = assetName;
             var shaderModule = AssetDataBase<ShaderModule>.GetNamed(shaderName);
+            _localSize = shaderModule.ComputeShaderLocalSize;
             _shaderHashes = [shaderModule.Hash];
 #if DEBUG
             _shaders = [shaderModule];
@@ -145,7 +149,7 @@ namespace VECS
             return false;
         }
 
-        public unsafe void Dispatch(VkCommandBuffer commandBuffer, int frameIndex, uint variantIndex, uint workGroupCountX, uint workGroupCountY = 1, uint workGroupCountZ = 1)
+        public unsafe void Dispatch(VkCommandBuffer commandBuffer, int frameIndex, uint variantIndex, uint invokeCountX, uint invokeCountY = 0, uint invokeCountZ = 0)
         {
             VkDescriptorBufferBindingInfoEXT* bindingInfo = stackalloc VkDescriptorBufferBindingInfoEXT[_descriptorSetCount];
             ulong* offsets = stackalloc ulong[_descriptorSetCount];
@@ -159,11 +163,11 @@ namespace VECS
                 indices[i] = i;
             }
 
-            Dispatch(commandBuffer, variantIndex, bindingInfo, offsets, indices, workGroupCountX, workGroupCountY, workGroupCountZ);
+            Dispatch(commandBuffer, variantIndex, bindingInfo, offsets, indices, invokeCountX, invokeCountY, invokeCountZ);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public unsafe void Dispatch(VkCommandBuffer commandBuffer, uint pushConstantIndex, VkDescriptorBufferBindingInfoEXT* bindingInfo, ulong* offsets, uint* indices, uint workGroupCountX, uint workGroupCountY = 1, uint workGroupCountZ = 1)
+        public unsafe void Dispatch(VkCommandBuffer commandBuffer, uint pushConstantIndex, VkDescriptorBufferBindingInfoEXT* bindingInfo, ulong* offsets, uint* indices, uint invokeCountX, uint invokeCountY = 0, uint invokeCountZ = 0)
         {
             var threadID = Environment.CurrentManagedThreadId;
             bool init = _lastBoundComputePipeline.TryGetValue(threadID, out var shaderHash);
@@ -178,7 +182,7 @@ namespace VECS
             DescriptorBuffer.SetOffsets(commandBuffer, _pipelineLayout, VkPipelineBindPoint.Compute, 0, (uint)_descriptorSetCount, offsets, indices);
 
             _pushConstantsHandler.BindPushConstants(commandBuffer, _pipelineLayout, pushConstantIndex);
-            GraphicsDevice.DeviceAPI.vkCmdDispatch(commandBuffer, workGroupCountX, workGroupCountY, workGroupCountZ);
+            GraphicsDevice.DeviceAPI.vkCmdDispatch(commandBuffer, invokeCountX.GetComputeShaderGroupCount(_localSize.X), invokeCountY.GetComputeShaderGroupCount(_localSize.Y), invokeCountZ.GetComputeShaderGroupCount(_localSize.Z));
         }
 
         public static ComputePipeline GetOrCreate(string shaderName)
@@ -282,6 +286,7 @@ namespace VECS
         public override VkPipeline Recreate()
         {
             ShaderModule shaderModule = AssetDataBase<ShaderModule>.GetHashed(_shaderHashes[0]);
+            _localSize = shaderModule.ComputeShaderLocalSize;
             VkComputePipelineCreateInfo computePipelineInfo = new()
             {
                 layout = _pipelineLayout,
@@ -297,13 +302,13 @@ namespace VECS
             _descriptorReWrite = true;
             uint usedVariantCount = (uint)VariantCount;
 
-            ShaderModule shaders = AssetDataBase<ShaderModule>.GetHashed(_shaderHashes[0]);
-
+            ShaderModule shaderModule = AssetDataBase<ShaderModule>.GetHashed(_shaderHashes[0]);
+            _localSize = shaderModule.ComputeShaderLocalSize;
             UniformBuffer existingUniformBuffer = _uniformBuffer;
             var oldShaderProperties = new Dictionary<int, ShaderProperty>(_cachedShaderProperties);
             var existingDescriptorSets = _descriptorSetInfos;
 
-            var descriptorSetBindings = GPUPipelineUtil.GetSharedBindings(shaders);
+            var descriptorSetBindings = GPUPipelineUtil.GetSharedBindings(shaderModule);
 
             PipelineRecreation.EnqueueForDisposal(_pipeline, _descriptorSetLayouts);
 
@@ -400,16 +405,16 @@ namespace VECS
                 }
             }
 
-            _pushConstantsHandler = new(shaders);
+            _pushConstantsHandler = new(shaderModule);
 
             VkComputePipelineCreateInfo computePipelineInfo = new()
             {
                 layout = _pipelineLayout,
-                stage = shaders.ShaderStageCreateInfo,
+                stage = shaderModule.ShaderStageCreateInfo,
                 flags = VkPipelineCreateFlags.DescriptorBufferEXT
             };
 
-            _pipelineLayout = GPUPipelineUtil.CreatePipelineLayout(_descriptorSetLayouts, _pushConstantsHandler, shaders);
+            _pipelineLayout = GPUPipelineUtil.CreatePipelineLayout(_descriptorSetLayouts, _pushConstantsHandler, shaderModule);
             _pipeline = GPUPipelineUtil.CreateComputePipeline(computePipelineInfo);
 
             GraphicsDevice.SetObjectName(VkObjectType.Pipeline, _pipeline.Handle, AssetName + "_v" + _version);

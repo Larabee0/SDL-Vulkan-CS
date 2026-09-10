@@ -45,17 +45,10 @@ namespace VECS
             return tex;
         }
 
-        private static Texture2D DirectLoad(string filePath, VkFormat format)
-        {
-            return TextureLoader.Load2D(filePath, format);
-        }
-
         public SMAA(IRenderer activeRenderer)
         {
             ActiveRenderer = activeRenderer;
 
-            //SearchTexture = DirectLoad(Path.Combine(TextureLoader.DefaultTexturePath, "SearchTex.tga"), VkFormat.R8Unorm);
-            //AreaTexture = DirectLoad(Path.Combine(TextureLoader.DefaultTexturePath, "AreaTex.tga"), VkFormat.R8G8B8A8Unorm);
             SearchTexture = DirectKTXLoad(Path.Combine(TextureLoader.DefaultTexturePath, "SearchTex.ktx"));
             AreaTexture = DirectKTXLoad(Path.Combine(TextureLoader.DefaultTexturePath, "AreaTex.ktx"));
 
@@ -66,18 +59,15 @@ namespace VECS
 
             pipelineConfig.rasterizationInfo.cullMode = VkCullModeFlags.None;
             pipelineConfig.rasterizationInfo.frontFace = VkFrontFace.Clockwise;
-            pipelineConfig.colourFormats = [VkFormat.B10G11R11UfloatPack32];
+            pipelineConfig.colourFormats[0] = ActiveRenderer.PostProcessingColourFormat;
             NeighbourhoodBlending = GraphicsPipeline.VertexFragmentPipeline("SMAA_Blending", "smaa_neighbourhood_blending.vert", "smaa_neighbourhood_blending.frag", pipelineConfig).Default();
-            //NeighbourhoodBlending = GraphicsPipeline.VertexFragmentPipeline("SMAA_Blending", "smaa_neighbor.hlsl.vert", "smaa_neighbor.hlsl.frag", pipelineConfig).Default();
 
-            pipelineConfig.colourFormats = [VkFormat.R8G8B8A8Unorm];
+            pipelineConfig.colourFormats[0] = VkFormat.R8G8B8A8Unorm;
             pipelineConfig.depthStencilInfo.depthTestEnable = false;
 
             EdgeDetection = GraphicsPipeline.VertexFragmentPipeline("SMAA_Edge", "smaa_edge_detection.vert", "smaa_edge_detection.frag", pipelineConfig).Default();
-            //EdgeDetection = GraphicsPipeline.VertexFragmentPipeline("SMAA_Edge", "smaa_edge.hlsl.vert", "smaa_edge.hlsl.frag", pipelineConfig).Default();
             
             BlendWeightCalc = GraphicsPipeline.VertexFragmentPipeline("SMAA_BlendWeight", "smaa_blending_weight.vert", "smaa_blending_weight.frag", pipelineConfig).Default();
-            //BlendWeightCalc = GraphicsPipeline.VertexFragmentPipeline("SMAA_BlendWeight", "smaa_blend.hlsl.vert", "smaa_blend.hlsl.frag", pipelineConfig).Default();
 
             BlendWeightCalc.SetTexture("uAreaTexture".GetShaderPropertyId(), AreaTexture);
             BlendWeightCalc.SetTexture("uSearchTexture".GetShaderPropertyId(), SearchTexture);
@@ -136,9 +126,9 @@ namespace VECS
                 unnormalizedCoordinates = false
 
             };
-            EdgeDetection.SetSampler("PointSampler".GetShaderPropertyId(), TextureExtensions.GetOrCreateSample(samplerCreateInfo));
+            //EdgeDetection.SetSampler("PointSampler".GetShaderPropertyId(), TextureExtensions.GetOrCreateSample(samplerCreateInfo));
             EdgeDetection.SetSampler("uSampler".GetShaderPropertyId(), TextureExtensions.GetOrCreateSample(samplerCreateInfo));
-            BlendWeightCalc.SetSampler("PointSampler".GetShaderPropertyId(), TextureExtensions.GetOrCreateSample(samplerCreateInfo));
+            //BlendWeightCalc.SetSampler("PointSampler".GetShaderPropertyId(), TextureExtensions.GetOrCreateSample(samplerCreateInfo));
             samplerCreateInfo = new()
             {
                 magFilter = VkFilter.Linear,
@@ -158,10 +148,10 @@ namespace VECS
                 unnormalizedCoordinates = false
 
             };
-            EdgeDetection.SetSampler("LinearSampler".GetShaderPropertyId(), TextureExtensions.GetOrCreateSample(samplerCreateInfo));
+            //EdgeDetection.SetSampler("LinearSampler".GetShaderPropertyId(), TextureExtensions.GetOrCreateSample(samplerCreateInfo));
             //BlendWeightCalc.SetSampler("uSampler".GetShaderPropertyId(), TextureExtensions.GetOrCreateSample(samplerCreateInfo));
-            BlendWeightCalc.SetSampler("LinearSampler".GetShaderPropertyId(), TextureExtensions.GetOrCreateSample(samplerCreateInfo));
-            NeighbourhoodBlending.SetSampler("LinearSampler".GetShaderPropertyId(), TextureExtensions.GetOrCreateSample(samplerCreateInfo));
+            //BlendWeightCalc.SetSampler("LinearSampler".GetShaderPropertyId(), TextureExtensions.GetOrCreateSample(samplerCreateInfo));
+            //NeighbourhoodBlending.SetSampler("LinearSampler".GetShaderPropertyId(), TextureExtensions.GetOrCreateSample(samplerCreateInfo));
             BlendWeightCalc.SetSampler("uSampler".GetShaderPropertyId(), TextureExtensions.GetOrCreateSample(samplerCreateInfo));
             NeighbourhoodBlending.SetSampler("uSampler".GetShaderPropertyId(), TextureExtensions.GetOrCreateSample(samplerCreateInfo));
         }
@@ -177,16 +167,12 @@ namespace VECS
             var texelSize = new Vector4(1.0f / windowExtents.width, 1.0f / windowExtents.height, windowExtents.width, windowExtents.height);
 
             EdgeDetection.PushConstants.SetPushConstantVector4("texelSize", 0, texelSize);
-            EdgeDetection.SetVector4("texelSize.value".GetShaderPropertyId(), texelSize);
             EdgeDetection.SetTexture("uColourTexture".GetShaderPropertyId(), EngineTextures.TryGetTexture(ShaderProperties.MainColourAttachmentId));
 
             BlendWeightCalc.PushConstants.SetPushConstantVector4("texelSize", 0, texelSize);
-            BlendWeightCalc.SetVector4("texelSize.value".GetShaderPropertyId(), texelSize);
-            BlendWeightCalc.SetTexture("uColourTexture".GetShaderPropertyId(), EdgeTarget.Target);
             BlendWeightCalc.SetTexture("uEdgeTexture".GetShaderPropertyId(), EdgeTarget.Target);
 
             NeighbourhoodBlending.PushConstants.SetPushConstantVector4("texelSize", 0, texelSize);
-            NeighbourhoodBlending.SetVector4("texelSize.value".GetShaderPropertyId(), texelSize);
             NeighbourhoodBlending.SetTexture("uBlendTexture".GetShaderPropertyId(), BlendTarget.Target);
             NeighbourhoodBlending.SetTexture("uColourTexture".GetShaderPropertyId(), EngineTextures.TryGetTexture(ShaderProperties.MainColourAttachmentId));
 #if DEBUG
@@ -222,7 +208,7 @@ namespace VECS
         private unsafe void OutputBlendWeights( RendererFrameInfo frameInfo)
         {
             var deferred = (DeferredRenderer)ActiveRenderer;
-            deferred.StartForwardRendering(frameInfo.CommandBuffer, VkAttachmentLoadOp.Clear,true,true);
+            deferred.StartForwardRendering(frameInfo.CommandBuffer, VkAttachmentLoadOp.Clear,true);
 
             BlitBlendTarget.Bind(frameInfo);
             GraphicsDevice.DeviceAPI.vkCmdDraw(frameInfo.CommandBuffer, 3, 1, 0, 0);

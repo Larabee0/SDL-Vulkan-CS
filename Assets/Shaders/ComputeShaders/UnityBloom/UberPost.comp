@@ -12,20 +12,18 @@ layout (set = 0, binding = 2) uniform writeonly image2D dstTexture;
 layout (set = 0, binding = 3) uniform Constants{
     vec4 bloomThreshold;
     vec4 bloomTint;
-    vec2 outputImageSize;
+    vec4 outputImageSize;
     float bloomStrength;
 } constants;
 
 vec2 ClampAndScaleUVForBilinearPostProcessTexture(vec2 UV)
 {
-    vec2 zw = vec2(1)/ constants.outputImageSize;
-    return ClampAndScaleUV(UV, zw, 0.5f, vec2(1.0));
+    return ClampAndScaleUV(UV, constants.outputImageSize.zw, 0.5f, vec2(1.0));
 }
 
 layout(local_size_x = 8, local_size_y = 8) in;
 void main(){
-    vec2 zw = vec2(1)/ constants.outputImageSize;
-    PositionInputs posInputs = GetPositionInput(vec2(gl_GlobalInvocationID.xy), zw, uvec2(8, 8));
+    PositionInputs posInputs = GetPositionInput(vec2(gl_GlobalInvocationID.xy), constants.outputImageSize.zw, uvec2(8, 8));
 
     vec2 uvDistorted = posInputs.positionNDC.xy;
     vec3 color = texture(srcMainTexture, ClampAndScaleUVForBilinearPostProcessTexture(uvDistorted)).rgb;

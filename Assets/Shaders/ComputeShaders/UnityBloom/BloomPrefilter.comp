@@ -7,12 +7,12 @@ layout (set = 0, binding = 0) uniform sampler2D srcTexture;
 layout (set = 0, binding = 1) uniform writeonly image2D dstTexture;
 
 layout (set = 0, binding = 2)  uniform Constants{
-    vec2 srcResolution; // screen size
-    vec2 outputImageSize; // texel size
+    vec4 outputImageSize; // texel size
     // vec4 screenSize; // main colour attachment screen size (srcTexture) raw pixels = xy | 1/raw pixels = zw
     // vec4 postProcessScreenSize; // main colour attachment screen size (srcTexture) raw pixels = xy | 1/raw pixels = zw
     // vec4 postProcessScale; // 1, 1, 1, 1
     vec4 bloomThreshold; // 0.0, -1.0*10-5, 0.00002, 25000.0
+    vec2 srcResolution; // screen size
 } constants;
 
 vec2 ClampAndScaleUVForBilinearPostProcessTexture(vec2 uv){
@@ -46,8 +46,7 @@ vec3 PartialAverage(vec3 c0, vec3 c1, vec3 c2, vec3 c3, float w0, float w1, floa
 layout(local_size_x = 8, local_size_y = 8) in;
 void main()
 {
-    vec2 texelSizeZW = vec2(1.0) / constants.outputImageSize;
-    PositionInputs posInputs = GetPositionInput(vec2(gl_GlobalInvocationID.xy), texelSizeZW, uvec2(8, 8));
+    PositionInputs posInputs = GetPositionInput(vec2(gl_GlobalInvocationID.xy), constants.outputImageSize.zw, uvec2(8, 8));
     vec2 uv = posInputs.positionNDC;
 	const vec2 kTaps [] = {
 		vec2 (0.0, 0.0),
@@ -72,14 +71,8 @@ void main()
 	vec3 prefilterOut = acc / wSum;
 
     // Guard bands
-//    prefilterOut *= all(gl_GlobalInvocationID.xy, uvec2(constants.outputImageSize));
+    prefilterOut *= all(gl_GlobalInvocationID.xy, uvec2(constants.outputImageSize));
     
-    if(gl_GlobalInvocationID.x > constants.outputImageSize.x  || gl_GlobalInvocationID.y > constants.outputImageSize.y){
-        prefilterOut  = vec3(0.0);
-    }
-
-
-
     imageStore(dstTexture, ivec2(posInputs.positionSS), vec4(prefilterOut,1.0));
 
 }

@@ -16,12 +16,10 @@ namespace VECS
         private ForwardQueue _forwardQueue;
 
         private OIT _orderIndpTransparency;
-        private Bloom _bloom;
         private SMAA _smaa;
 
-        public static readonly VkFormat[] Colours = [VkFormat.R32G32B32A32Sfloat, VkFormat.R32G32B32A32Sfloat];
-
-        public VkFormat[] ColourFormats => Colours;
+        public VkFormat MainColourFormat => VkFormat.R16G16B16A16Sfloat;
+        public VkFormat PostProcessingColourFormat => VkFormat.B10G11R11UfloatPack32;
 
         public VkFormat DepthFormat => PreferredFormats.LOW_PRECISION_DEPTH_ONLY;
         public VkFormat StencilFormat => VkFormat.Undefined;
@@ -43,7 +41,6 @@ namespace VECS
             EnginePipes.DepthOnly.PushConstants.SetPushConstantInt("layerCount", DEPTH_ONLY_PUSH_CONSTANT_INDEX, 1);
             EnginePipes.DepthOnly.PushConstants.SetPushConstantInt("bufferSelect", DEPTH_ONLY_PUSH_CONSTANT_INDEX, 0);
             _orderIndpTransparency = new(this);
-            _bloom = new(this);
             _smaa = new(this);
             Skybox.StartSkybox();
             PBR.StartPBR();
@@ -54,11 +51,9 @@ namespace VECS
             EngineBuffers.RemoveEngineBuffer(ShaderProperties.LinkedListSBOId);
             var windowExtents = Application.MainWindow.WindowExtent;
 
-            MainColourAttachment = IRenderer.CreateOrUpdateRT(MainColourAttachment, "MainColourAttachment", ShaderProperties.MainColourAttachmentId, windowExtents, ColourFormats[0], new VkClearValue(0, 0, 0, 1));
-            BrightObjectAttachment = IRenderer.CreateOrUpdateRT(BrightObjectAttachment, "BrightObjectAttachment", ShaderProperties.BrightColourAttachmentId, windowExtents, ColourFormats[1], new VkClearValue(0, 0, 0, 1));
+            MainColourAttachment = IRenderer.CreateOrUpdateRT(MainColourAttachment, "MainColourAttachment", ShaderProperties.MainColourAttachmentId, windowExtents, MainColourFormat, new VkClearValue(0, 0, 0, 1));
             DepthAttachment = IRenderer.CreateOrUpdateRT(DepthAttachment, "DepthAttacment", ShaderProperties.MainDepthAttachmentId, windowExtents, DepthFormat, new VkClearValue(1,0));
 
-            _bloom?.RecreateRenderTargets();
             _smaa?.RecreateRenderTargets();
             _onScreenSizeChanged?.Invoke();
         }

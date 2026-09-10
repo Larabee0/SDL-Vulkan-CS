@@ -49,8 +49,10 @@ namespace VECS
 
         private static ulong _framesSinceSwapChainRecreation = 0;
 
-        public static VkFormat[] ColourFormats => Instance._renderer.ColourFormats;
+        public static VkFormat MainColourFormat => Instance._renderer.MainColourFormat;
+        public static VkFormat PostProcessingcolourFormat => Instance._renderer.PostProcessingColourFormat;
         public static VkFormat DepthFormat => Instance._renderer.DepthFormat;
+        public static VkFormat StencilFormat => Instance._renderer.StencilFormat;
 
         internal Action PostPresentationUpdate;
         internal Action<int> PreGraphicsPipe;

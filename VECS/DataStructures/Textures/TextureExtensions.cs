@@ -123,7 +123,9 @@ namespace VECS
         private readonly static ConcurrentQueue<TextureBufferCopyCmd> _copyBufferToTexture = [];
         private readonly static ConcurrentQueue<TextureBufferCopyCmd> _copyTextureToBuffer = [];
         private readonly static ConcurrentQueue<Texture> _regenMipMapsCmds = [];
-        private readonly static ConcurrentQueue<SetTextureLayoutCmd> _setLayoutCmds = [];
+        private readonly static ConcurrentQueue<SetTextureLayoutCmd> _setLayoutCmdsQueue = [];
+
+        private readonly static List<SetTextureLayoutCmd> _setLayoutCmds = [];
 
         private readonly static ConcurrentQueue<DisposeTextureCmd> _disposalQueue = [];
         private readonly static List<DisposeTextureCmd> _disposalList = [];
@@ -383,16 +385,31 @@ namespace VECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static void SetImageLayout(Texture texture,VkImageLayout newImageLayout, VkPipelineStageFlags2 srcStage , VkPipelineStageFlags2 dstStage)
         {
-            _setLayoutCmds.Enqueue(new(texture, newImageLayout, srcStage, dstStage));
+            _setLayoutCmdsQueue.Enqueue(new(texture, newImageLayout, srcStage, dstStage));
         }
 
-        internal static void PlaybackSetLayoutCmds(VkCommandBuffer cmd)
+        internal unsafe static void PlaybackSetLayoutCmds(VkCommandBuffer cmd)
         {
-            while(_setLayoutCmds.TryDequeue(out var layout))
+            if (_setLayoutCmdsQueue.IsEmpty) return;
+            _setLayoutCmds.Clear();
+            _setLayoutCmds.EnsureCapacity(_setLayoutCmdsQueue.Count);
+            while (_setLayoutCmdsQueue.TryDequeue(out var layout))
             {
-                var srcStage = layout.Texture.ImageLayout.GetStageFlagFromLayout();
-                layout.Texture.SetImageLayout(cmd, layout.NewImageLayout, srcStage, layout.DstStage);
+                _setLayoutCmds.Add(layout);
             }
+
+            VkImageMemoryBarrier2* barriers = stackalloc VkImageMemoryBarrier2[_setLayoutCmds.Count];
+
+            for (int i = 0; i < _setLayoutCmds.Count; i++)
+            {
+                var layout = _setLayoutCmds[i];
+                var srcStage = layout.Texture.ImageLayout.GetStageFlagFromLayout();
+                barriers[i] = layout.Texture.GetImageLayoutBarrier(layout.NewImageLayout, layout.Texture.GetSubresourceRange(), srcStage, layout.DstStage);
+                layout.Texture.SetImageLayoutSilent(layout.NewImageLayout);
+            }
+
+            MemoryBarrierHelper.ImageMemoryBarrier(cmd, barriers, (uint)_setLayoutCmds.Count);
+
         }
         #endregion
 

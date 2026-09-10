@@ -142,6 +142,7 @@ namespace VECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static unsafe void ImageMemoryBarrier(VkCommandBuffer cmdBuffer, VkImageMemoryBarrier2* barriers, uint barrierCount)
         {
+            if (barrierCount == 0) return;
             VkDependencyInfo info = new()
             {
                 imageMemoryBarrierCount = barrierCount,
@@ -153,6 +154,7 @@ namespace VECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static unsafe void BufferMemoryBarrier(VkCommandBuffer cmdBuffer,uint barrierCount,VkBufferMemoryBarrier2* barriers)
         {
+            if (barrierCount == 0) return;
             VkDependencyInfo info = new()
             {
                 bufferMemoryBarrierCount = barrierCount,
@@ -183,6 +185,7 @@ namespace VECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static unsafe void MemoryBarrier(VkCommandBuffer cmdBuffer, uint barrierCount, VkMemoryBarrier2* barriers)
         {
+            if (barrierCount == 0) return;
             VkDependencyInfo info = new()
             {
                 memoryBarrierCount = barrierCount,

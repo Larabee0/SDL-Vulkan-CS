@@ -4,6 +4,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Numerics;
 using System.Text;
 #if PARALLEL_SHADER_LOADING
 using System.Threading.Tasks;
@@ -52,6 +53,7 @@ namespace VECS
         private SpvReflectShaderModule _spvShaderModule;
         private VkShaderStageFlags _vkStage = VkShaderStageFlags.None;
         private SpvReflectShaderStageFlags _spvStage = SpvReflectShaderStageFlags.None;
+        private Vector3UInt _computeShaderLocalSize = new(1, 1, 1);
 
         private VkVertexInputBindingDescription[] _vertexBindings = [];
         private VkVertexInputAttributeDescription[] _vertexAttributes = [];
@@ -64,7 +66,7 @@ namespace VECS
 
         public VkShaderStageFlags VkShaderStage => _vkStage;
         public SpvReflectShaderStageFlags SpvShaderStage => _spvStage;
-
+        public Vector3UInt ComputeShaderLocalSize => _computeShaderLocalSize;
         public bool HasVertexAttributes => _hasVertexAttributes;
         public VkVertexInputBindingDescription[] VertexBindings =>_vertexBindings;
         public VkVertexInputAttributeDescription[] VertexAttributes => _vertexAttributes;
@@ -124,7 +126,10 @@ namespace VECS
                         break;
                 }
             }
-
+            if(_vkStage == VkShaderStageFlags.Compute)
+            {
+                _computeShaderLocalSize = new(_spvShaderModule.entry_points[0].local_size.x, _spvShaderModule.entry_points[0].local_size.y, _spvShaderModule.entry_points[0].local_size.z);
+            }
             if (disposeNow)
             {
                 _disposed = true;

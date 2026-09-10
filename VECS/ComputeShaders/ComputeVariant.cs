@@ -395,7 +395,7 @@ namespace VECS
             }
         }
 
-        public unsafe void Dispatch(VkCommandBuffer commandBuffer, int frameIndex, uint workGroupCountX, uint workGroupCountY = 1, uint workGroupCountZ = 1)
+        public unsafe void Dispatch(VkCommandBuffer commandBuffer, int frameIndex, uint invokeCountX, uint invokeCountY =0, uint invokeCountZ = 0)
         {
             if (localUniformAllocation)
             {
@@ -414,11 +414,11 @@ namespace VECS
                     indices[i] = i;
                 }
 
-                _computePipeline.Dispatch(commandBuffer, VariantIndex, bindingInfo, offsets, indices, workGroupCountX, workGroupCountY, workGroupCountZ);
+                _computePipeline.Dispatch(commandBuffer, VariantIndex, bindingInfo, offsets, indices, invokeCountX, invokeCountY, invokeCountZ);
             }
             else
             {
-                _computePipeline.Dispatch(commandBuffer,frameIndex,VariantIndex,workGroupCountX, workGroupCountY, workGroupCountZ);
+                _computePipeline.Dispatch(commandBuffer,frameIndex,VariantIndex,invokeCountX, invokeCountY, invokeCountZ);
             }
         }
 

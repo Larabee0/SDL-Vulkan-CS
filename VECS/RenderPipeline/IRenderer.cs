@@ -4,7 +4,8 @@ namespace VECS
 {
     public interface IRenderer
     {
-        public VkFormat[] ColourFormats { get; }
+        public VkFormat MainColourFormat { get; }
+        public VkFormat PostProcessingColourFormat { get; }
         public VkFormat DepthFormat { get; }
         public VkFormat StencilFormat { get; }
 

@@ -188,7 +188,7 @@ namespace VECS
                 _depthReduceShader.PushConstantsHandler.SetPushConstantVector2("imageSize", 0, new(x, y));
                 _depthReduceShader.PushConstantsHandler.SetPushConstantInt("srcIndex", 0, i);
                 _depthReduceShader.PushConstantsHandler.SetPushConstantInt("dstIndex", 0, i);
-                _depthReduceShader.Dispatch(frameInfo.CommandBuffer, Presenter.FrameIndex, GetGroupCount(x, 32), GetGroupCount(y, 32));
+                _depthReduceShader.Dispatch(frameInfo.CommandBuffer, Presenter.FrameIndex, x, y);
 
                 GraphicsDevice.DeviceAPI.vkCmdPipelineBarrier2(frameInfo.CommandBuffer, &dependencyInfo);
             }
@@ -213,12 +213,6 @@ namespace VECS
             };
             GraphicsDevice.DeviceAPI.vkCmdPipelineBarrier2(frameInfo.CommandBuffer, &depthDependencyInfo);
             depthTexture._imageLayout = VkImageLayout.DepthStencilAttachmentOptimal;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static uint  GetGroupCount(uint threadCount, uint localSize)
-        {
-            return (threadCount + localSize - 1) / localSize;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

@@ -1,4 +1,5 @@
-﻿using System;
+﻿#define PARALLEL_SHADER_COMPILER
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -59,12 +60,17 @@ namespace VECS
             }
             
             ShaderModule[] shaderModules = new ShaderModule[shaderFiles.Count];
-
+#if PARALLEL_SHADER_COMPILER
             Application.ParallelFor(shaderModules.Length, (i) =>
             {
                 shaderModules[i] = Compile(shaderFiles[i].FullName);
             });
-
+#else
+            for (int i = 0; i < shaderModules.Length; i++)
+            {
+                shaderModules[i] = Compile(shaderFiles[i].FullName);
+            }
+#endif
             for (int i = 0; i < shaderModules.Length; i++)
             {
                 if (shaderModules[i] == null || shaderModules[i].IsDisposed) continue;

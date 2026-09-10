@@ -14,7 +14,7 @@ float inverseLerp(float a, float b, float value)
     return a != b ? (value - a) / (b - a) : 0;
 }
 
-layout(local_size_x = 32, local_size_y = 32) in;
+layout(local_size_x = 8, local_size_y = 8) in;
 void main() {
 	uvec2 outPos = gl_GlobalInvocationID.xy;
 	if(outPos.x > constants.outputImageSize.x || outPos.y > constants.outputImageSize.y){

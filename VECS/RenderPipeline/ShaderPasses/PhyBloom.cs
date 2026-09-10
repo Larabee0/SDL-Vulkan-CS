@@ -36,7 +36,7 @@ namespace VECS
             _downSample = ComputePipeline.GetOrCreate("bloom_down_sample.comp");
             _upSample = ComputePipeline.GetOrCreate("bloom_up_sample.comp");
             _bloomMix = ComputePipeline.GetOrCreate("bloom_mix.comp").Default();
-            var colourFormat = _activeRenderer.ColourFormats[0];
+            var colourFormat = _activeRenderer.MainColourFormat;
             _bloomDown = new("PhyBloomDownTexture", 8, 8, colourFormat, VkImageUsageFlags.Storage | VkImageUsageFlags.Sampled | VkImageUsageFlags.TransferDst, VkSamplerAddressMode.ClampToEdge, true);
             _bloomUp = new("PhyBloomUpTexture", 8, 8, colourFormat, VkImageUsageFlags.Storage | VkImageUsageFlags.Sampled | VkImageUsageFlags.TransferDst, VkSamplerAddressMode.ClampToEdge, true);
             var config = GraphicsPipelineConfigInfo.DefaultPipelineConfigInfo([], []);
@@ -172,7 +172,7 @@ namespace VECS
                 }
                 var variant = _downSample.GetOrCreateVariant(i);
                 TextureLoader.CalculateMipLevelSize(_bloomDown.Width, _bloomDown.Height, (int)i, out int mipWidth,  out int mipHeight);
-                variant.Dispatch(frameInfo.CommandBuffer,Presenter.FrameIndex,GetGroupCount((uint)mipWidth, 8),GetGroupCount((uint)mipHeight, 8));
+                variant.Dispatch(frameInfo.CommandBuffer,Presenter.FrameIndex,(uint)mipWidth,(uint)mipHeight);
 
                 range.baseMipLevel = i;
 
@@ -234,7 +234,7 @@ namespace VECS
                 }
                 var variant = _upSample.GetOrCreateVariant((uint)i);
                 TextureLoader.CalculateMipLevelSize(_bloomDown.Width, _bloomDown.Height, (int)i, out int mipWidth, out int mipHeight);
-                variant.Dispatch(frameInfo.CommandBuffer, Presenter.FrameIndex, GetGroupCount((uint)mipWidth, 8), GetGroupCount((uint)mipHeight, 8));
+                variant.Dispatch(frameInfo.CommandBuffer, Presenter.FrameIndex, (uint)mipWidth, (uint)mipHeight);
 
                 range.baseMipLevel = (uint)i ;
 

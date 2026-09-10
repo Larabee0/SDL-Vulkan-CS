@@ -39,7 +39,7 @@ float glLinearDepth(float depth){
 
 #define noiseScale vec2(constants.outputImageSize.x / 4.0, constants.outputImageSize.y / 4.0)
 
-layout(local_size_x = 32, local_size_y = 32) in;
+layout(local_size_x = 8, local_size_y = 8) in;
 void main(){
 	uvec2 outPos = gl_GlobalInvocationID.xy;
 	if(outPos.x > constants.outputImageSize.x || outPos.y > constants.outputImageSize.y){

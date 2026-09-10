@@ -273,7 +273,7 @@ namespace VECS
             invokeVariant.SetStorageBuffer(DrawBufferId, drawIndirect, indirectCmdOffset, drawCount);
             invokeVariant.SetStorageBuffer(BoundsBufferId, bounds);
             invokeVariant.SetTexture(DepthPyramidId, DepthReduction.DepthPryamid);
-            invokeVariant.Dispatch(commandBuffer, frameIndex, (drawCount / 256) + 1);
+            invokeVariant.Dispatch(commandBuffer, frameIndex, drawCount);
 
             VkBufferMemoryBarrier2 barrier = new()
             {

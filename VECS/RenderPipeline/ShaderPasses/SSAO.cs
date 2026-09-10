@@ -121,12 +121,12 @@ namespace VECS
         private void GenerateSSAO(RendererFrameInfo frameInfo)
         {
             _computeSSAOGenerate.PushConstantsHandler.SetPushConstantUInt("cameraIndex", 0, 0);
-            _computeSSAOGenerate.Dispatch(frameInfo.CommandBuffer, Presenter.FrameIndex, GetGroupCount((uint)_ssaoRT.Target.Width, 32), GetGroupCount((uint)_ssaoRT.Target.Height, 32));
+            _computeSSAOGenerate.Dispatch(frameInfo.CommandBuffer, Presenter.FrameIndex, (uint)_ssaoRT.Target.Width, (uint)_ssaoRT.Target.Height);
         }
 
         private void BlurSSAO(RendererFrameInfo frameInfo)
         {
-            _computeSSAOBlur.Dispatch(frameInfo.CommandBuffer, Presenter.FrameIndex, GetGroupCount((uint)_ssaoBlurRt.Target.Width, 32), GetGroupCount((uint)_ssaoBlurRt.Target.Height, 32));
+            _computeSSAOBlur.Dispatch(frameInfo.CommandBuffer, Presenter.FrameIndex, (uint)_ssaoBlurRt.Target.Width, (uint)_ssaoBlurRt.Target.Height);
 
             _SSAO_Cleared = false;
         }
@@ -159,10 +159,5 @@ namespace VECS
             }
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static uint GetGroupCount(uint threadCount, uint localSize)
-        {
-            return (threadCount + localSize - 1) / localSize;
-        }
     }
 }

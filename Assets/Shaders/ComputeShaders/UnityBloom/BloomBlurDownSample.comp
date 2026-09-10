@@ -7,7 +7,7 @@ layout (set = 0, binding = 0) uniform sampler2D srcTexture;
 layout (set = 0, binding = 1) uniform writeonly image2D dstTexture;
 
 layout (set = 0, binding = 2)  uniform Constants{
-    vec2 outputImageSize; // texel size
+    vec4 outputImageSize; // texel size
 } constants;
 
 #include "bloom_blur_common.glsl"
@@ -19,12 +19,12 @@ void main()
     ivec2 threadUL = ((ivec2(gl_LocalInvocationID.xy) << ivec2(1)) + (ivec2(gl_WorkGroupID.xy) << ivec2(3)) + ivec2(-4));
 
     vec2 offset = vec2(threadUL);
-    vec2 texelSizeZW = vec2(1.0) / constants.outputImageSize;
-    vec2 maxCoord = 1.0 - 0.5 * texelSizeZW;
-    vec3 p00 = texture(srcTexture, ClampAndScaleUVForBilinearPostProcessTexture((offset                  + 0.5) * texelSizeZW, texelSizeZW)).rgb;
-    vec3 p10 = texture(srcTexture, ClampAndScaleUVForBilinearPostProcessTexture((offset + vec2(1.0, 0.0) + 0.5) * texelSizeZW, texelSizeZW)).rgb;
-    vec3 p01 = texture(srcTexture, ClampAndScaleUVForBilinearPostProcessTexture((offset + vec2(0.0, 1.0) + 0.5) * texelSizeZW, texelSizeZW)).rgb;
-    vec3 p11 = texture(srcTexture, ClampAndScaleUVForBilinearPostProcessTexture((offset + vec2(1.0, 1.0) + 0.5) * texelSizeZW, texelSizeZW)).rgb;
+    
+    vec2 maxCoord = 1.0 - 0.5 * constants.outputImageSize.zw;
+    vec3 p00 = texture(srcTexture, ClampAndScaleUVForBilinearPostProcessTexture((offset                  + 0.5) * constants.outputImageSize.zw, constants.outputImageSize.zw)).rgb;
+    vec3 p10 = texture(srcTexture, ClampAndScaleUVForBilinearPostProcessTexture((offset + vec2(1.0, 0.0) + 0.5) * constants.outputImageSize.zw, constants.outputImageSize.zw)).rgb;
+    vec3 p01 = texture(srcTexture, ClampAndScaleUVForBilinearPostProcessTexture((offset + vec2(0.0, 1.0) + 0.5) * constants.outputImageSize.zw, constants.outputImageSize.zw)).rgb;
+    vec3 p11 = texture(srcTexture, ClampAndScaleUVForBilinearPostProcessTexture((offset + vec2(1.0, 1.0) + 0.5) * constants.outputImageSize.zw, constants.outputImageSize.zw)).rgb;
 
     // Store the 4 downsampled pixels in LDS
     uint destIdx = gl_LocalInvocationID.x + (gl_LocalInvocationID.y << 4u);

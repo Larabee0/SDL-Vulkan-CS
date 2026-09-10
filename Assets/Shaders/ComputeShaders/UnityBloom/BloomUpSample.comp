@@ -8,25 +8,22 @@ layout (set = 0, binding = 1, rgba32f) uniform image2D srcHighTexture;
 layout (set = 0, binding = 2) uniform writeonly image2D dstTexture;
 
 layout (set = 0, binding = 3) uniform Constants{
-    vec2 lowSize;
-    vec2 highSize;
+    vec4 lowSize;
+    vec4 highSize;
     float scatter; // 0.68
 } constants;
 
 layout(local_size_x = 8, local_size_y = 8) in;
 void main()
 {
-    vec2 lowSizeZW = vec2(1.0) / constants.lowSize;
-    vec2 texelSizeZW = vec2(1.0) / constants.highSize;
+    PositionInputs posInputs = GetPositionInput(vec2(gl_GlobalInvocationID.xy), constants.highSize.zw, uvec2(8));
 
-    PositionInputs posInputs = GetPositionInput(vec2(gl_GlobalInvocationID.xy), texelSizeZW, uvec2(8));
-
-    vec2 uv = ClampAndScaleUVPostProcessTexture(posInputs.positionNDC, lowSizeZW, 1.0f);
+    vec2 uv = ClampAndScaleUVPostProcessTexture(posInputs.positionNDC, constants.lowSize.zw, 1.0f);
 
     vec3 highRes = imageLoad(srcHighTexture, ivec2(clamp(posInputs.positionSS, uvec2(0), constants.highSize.xy - 1))).xyz;
 
-    vec2 maxCoord = 1.0f - texelSizeZW;
-    vec3 lowRes = SampleTexture2DBicubic(srcLowTexture, uv, vec4(constants.lowSize, lowSizeZW), maxCoord).xyz;
+    vec2 maxCoord = 1.0f - constants.highSize.zw;
+    vec3 lowRes = SampleTexture2DBicubic(srcLowTexture, uv, constants.lowSize, maxCoord).xyz;
 
 
     vec3 upSampleOut = mix(highRes, lowRes, constants.scatter);
